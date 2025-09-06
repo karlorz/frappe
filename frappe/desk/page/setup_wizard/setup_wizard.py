@@ -518,7 +518,50 @@ def make_records(records, debug=False):
 		savepoint = "setup_fixtures_creation"
 		try:
 			frappe.db.savepoint(savepoint)
-			doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
+			doc.insert(ignore_permissions=frappe.flags.in_setup_wizard or frappe.flags.in_install, ignore_if_duplicate=True)
+		except frappe.LinkValidationError as e:
+			frappe.clear_last_message()
+			frappe.db.rollback(save_point=savepoint)
+			
+			# Special handling for Department parent creation
+			if "Could not find Parent Department: All Departments" in str(e):
+				# Import shared utility functions
+				from erpnext.setup.utils import ensure_all_departments_root, resolve_company_context
+				
+				# Resolve company context and ensure root department exists
+				company = resolve_company_context(doc)
+				if ensure_all_departments_root(company):
+					# Try to insert the original document again
+					try:
+						frappe.db.savepoint(savepoint)
+						doc.insert(ignore_permissions=frappe.flags.in_setup_wizard or frappe.flags.in_install, ignore_if_duplicate=True)
+					except Exception as retry_exception:
+						frappe.log_error(
+							f"Failed to create department after ensuring parent exists: {doc.get('department_name', 'Unknown')}. Error: {str(retry_exception)}",
+							"Department Creation Error"
+						)
+						show_document_insert_error()
+				else:
+					frappe.log_error(
+						f"Failed to create 'All Departments' root for company: {company}",
+						"Department Creation Error"
+					)
+					show_document_insert_error()
+			else:
+				# Handle other LinkValidationErrors
+				exception = record.get("__exception")
+				if exception:
+					config = _dict(exception)
+					if isinstance(e, config.exception):
+						config.handler()
+					else:
+						show_document_insert_error()
+				else:
+					show_document_insert_error()
+		except frappe.DuplicateEntryError:
+			# Skip duplicate records
+			frappe.clear_last_message()
+			frappe.db.rollback(save_point=savepoint)
 		except Exception as e:
 			frappe.clear_last_message()
 			frappe.db.rollback(save_point=savepoint)
