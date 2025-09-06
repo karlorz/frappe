@@ -56,7 +56,7 @@ def setup_complete(args):
 	if frappe.is_setup_complete():
 		return {"status": "ok"}
 
-	kwargs = parse_args(sanitize_input(args))
+	kwargs = parse_args(args)
 	stages = get_setup_stages(kwargs)
 	is_background_task = frappe.conf.get("trigger_site_setup_in_background")
 
@@ -74,7 +74,7 @@ def initialize_system_settings_and_user(system_settings_data, user_data):
 	if cint(system_settings.setup_complete):
 		return
 
-	system_settings_data = parse_args(sanitize_input(system_settings_data))
+	system_settings_data = parse_args(system_settings_data)
 	system_settings.update(
 		{
 			"language": system_settings_data.get("language"),
@@ -85,7 +85,7 @@ def initialize_system_settings_and_user(system_settings_data, user_data):
 	)
 	system_settings.save()
 
-	user_data = parse_args(sanitize_input(user_data))
+	user_data = parse_args(user_data)
 	create_or_update_user(user_data)
 
 
