@@ -65,21 +65,22 @@ jobs:
           git fetch origin version-15-dev
           if ! git diff --quiet origin/version-15..origin/version-15-dev; then
             echo "Creating PR to merge upstream changes into version-15-dev"
+            
             gh pr create \
-              --title "Sync upstream frappe changes from version-15 to version-15-dev" \
-              --body "This PR syncs the latest upstream changes from \`version-15\` branch into \`version-15-dev\`. 
+              --title "Sync upstream changes from version-15 to version-15-dev" \
+              --body "This PR syncs the latest upstream changes from version-15 branch into version-15-dev.
 
-Please review the changes and resolve any conflicts if present.
+            Please review the changes and resolve any conflicts if present.
 
-**Changes include:**
-- Latest upstream commits from frappe/frappe version-15 branch
-- Automated sync from upstream repository
+            **Changes include:**
+            - Latest upstream commits from frappe/frappe version-15 branch  
+            - Automated sync from upstream repository
 
-**Next steps:**
-1. Review the changes
-2. Resolve any conflicts if present  
-3. Test the merged changes
-4. Merge when ready" \
+            **Next steps:**
+            1. Review the changes
+            2. Resolve any conflicts if present
+            3. Test the merged changes  
+            4. Merge when ready" \
               --head version-15 \
               --base version-15-dev \
               --assignee ${{ github.actor }} || echo "PR already exists or no changes to sync"
