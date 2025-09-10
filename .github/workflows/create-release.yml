@@ -1,34 +1,16 @@
-name: Generate Semantic Release
+# Disabled - Use custom-release.yml workflow instead
+# This workflow is disabled because we use manual Custom Release workflow
+# to maintain version parity with upstream releases
+
+name: Generate Semantic Release (DISABLED)
 on:
-  push:
-    branches:
-      - version-15
-permissions:
-  contents: read
+  workflow_dispatch: # Only manual trigger allowed
 
 jobs:
   release:
-    name: Release
+    name: Release (DISABLED)
     runs-on: ubuntu-latest
+    if: false  # Always skip this job
     steps:
-      - name: Checkout Entire Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20
-      - name: Setup dependencies
-        run: |
-          npm install @semantic-release/git @semantic-release/exec --no-save
-      - name: Create Release
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          GIT_AUTHOR_NAME: "Frappe PR Bot"
-          GIT_AUTHOR_EMAIL: "developers@frappe.io"
-          GIT_COMMITTER_NAME: "Frappe PR Bot"
-          GIT_COMMITTER_EMAIL: "developers@frappe.io"
-        run: npx semantic-release
+      - name: Disabled
+        run: echo "This workflow is disabled. Use custom-release.yml instead."
