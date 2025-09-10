@@ -3,10 +3,6 @@ name: Custom Release
 on:
   workflow_dispatch:
     inputs:
-      base_version:
-        description: 'Base version from upstream (e.g., 15.78.1)'
-        required: true
-        type: string
       release_notes:
         description: 'Custom release notes'
         required: false
@@ -31,28 +27,58 @@ jobs:
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@github.com"
 
+      - name: Determine version
+        id: version
+        run: |
+          # Get latest non-dev tag (production releases)
+          LATEST_TAG=$(git tag --sort=-version:refname | grep -v '\-dev$' | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No tags found, using default version"
+            BASE_VERSION="15.78.1"
+          else
+            # Remove 'v' prefix if present
+            BASE_VERSION=${LATEST_TAG#v}
+          fi
+          
+          DEV_TAG="v${BASE_VERSION}-dev"
+          
+          # Check if -dev tag already exists
+          if git tag | grep -q "^${DEV_TAG}$"; then
+            echo "Tag ${DEV_TAG} already exists, incrementing patch version"
+            # Parse version parts
+            IFS='.' read -r major minor patch <<< "$BASE_VERSION"
+            NEW_PATCH=$((patch + 1))
+            BASE_VERSION="${major}.${minor}.${NEW_PATCH}"
+            DEV_TAG="v${BASE_VERSION}-dev"
+          fi
+          
+          echo "base_version=${BASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "dev_tag=${DEV_TAG}" >> $GITHUB_OUTPUT
+          echo "Using version: ${BASE_VERSION}-dev (tag: ${DEV_TAG})"
+
       - name: Update version in frappe/__init__.py
         run: |
-          sed -i "s/__version__ = .*/__version__ = \"${{ github.event.inputs.base_version }}\"/" frappe/__init__.py
+          sed -i "s/__version__ = .*/__version__ = \"${{ steps.version.outputs.base_version }}-dev\"/" frappe/__init__.py
           git add frappe/__init__.py
-          git commit -m "chore(release): update version to ${{ github.event.inputs.base_version }}-dev [skip ci]" || echo "No changes to commit"
+          git commit -m "chore(release): update version to ${{ steps.version.outputs.base_version }}-dev [skip ci]" || echo "No changes to commit"
 
       - name: Create and push tag
         run: |
-          TAG_NAME="v${{ github.event.inputs.base_version }}-dev"
+          TAG_NAME="${{ steps.version.outputs.dev_tag }}"
           git tag $TAG_NAME
           git push origin $TAG_NAME
 
       - name: Create GitHub Release
         run: |
-          TAG_NAME="v${{ github.event.inputs.base_version }}-dev"
+          TAG_NAME="${{ steps.version.outputs.dev_tag }}"
+          BASE_VERSION="${{ steps.version.outputs.base_version }}"
           RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
           
           if [ -z "$RELEASE_NOTES" ]; then
-            RELEASE_NOTES="Custom frappe release v${{ github.event.inputs.base_version }}-dev based on upstream Frappe v${{ github.event.inputs.base_version }}
+            RELEASE_NOTES="Custom frappe release v${BASE_VERSION}-dev based on upstream Frappe v${BASE_VERSION}
 
           ## Changes in this release:
-          - Based on upstream Frappe v${{ github.event.inputs.base_version }}
+          - Based on upstream Frappe v${BASE_VERSION}
           - Contains custom modifications and enhancements  
           - All custom features are preserved
 
@@ -61,7 +87,7 @@ jobs:
           fi
           
           gh release create $TAG_NAME \
-            --title "Frappe v${{ github.event.inputs.base_version }}-dev" \
+            --title "Frappe v${BASE_VERSION}-dev" \
             --notes "$RELEASE_NOTES" \
             --target version-15-dev
         env:
