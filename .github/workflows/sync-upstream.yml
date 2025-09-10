@@ -1,0 +1,90 @@
+name: Sync Upstream version-15
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC / 11:30 AM IST
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      force_push:
+        description: 'Force push even if there are conflicts'
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: version-15
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/frappe/frappe.git || true
+          git remote set-url upstream https://github.com/frappe/frappe.git
+
+      - name: Fetch upstream changes
+        run: |
+          git fetch upstream version-15
+
+      - name: Sync version-15 branch
+        run: |
+          git checkout version-15
+          if [ "${{ github.event.inputs.force_push }}" == "true" ]; then
+            echo "Force pushing changes..."
+            git reset --hard upstream/version-15
+            git push --force-with-lease origin version-15
+          else
+            # Try to merge, if conflicts exist, reset to upstream
+            if git merge upstream/version-15 --no-edit; then
+              echo "Merge successful"
+              git push origin version-15
+            else
+              echo "Merge conflicts detected, resetting to upstream"
+              git merge --abort
+              git reset --hard upstream/version-15
+              git push --force-with-lease origin version-15
+            fi
+          fi
+
+      - name: Create PR to merge into version-15-dev
+        run: |
+          # Check if there are differences between version-15 and version-15-dev
+          git fetch origin version-15-dev
+          if ! git diff --quiet origin/version-15..origin/version-15-dev; then
+            echo "Creating PR to merge upstream changes into version-15-dev"
+            gh pr create \
+              --title "Sync upstream frappe changes from version-15 to version-15-dev" \
+              --body "This PR syncs the latest upstream changes from \`version-15\` branch into \`version-15-dev\`. 
+
+Please review the changes and resolve any conflicts if present.
+
+**Changes include:**
+- Latest upstream commits from frappe/frappe version-15 branch
+- Automated sync from upstream repository
+
+**Next steps:**
+1. Review the changes
+2. Resolve any conflicts if present  
+3. Test the merged changes
+4. Merge when ready" \
+              --head version-15 \
+              --base version-15-dev \
+              --assignee ${{ github.actor }} || echo "PR already exists or no changes to sync"
+          else
+            echo "No differences found between version-15 and version-15-dev"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

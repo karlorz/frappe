@@ -1,0 +1,72 @@
+name: Custom Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_version:
+        description: 'Base version from upstream (e.g., 15.78.1)'
+        required: true
+        type: string
+      release_notes:
+        description: 'Custom release notes'
+        required: false
+        type: string
+        default: 'Custom frappe release based on upstream with additional features'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+
+      - name: Update version in frappe/__init__.py
+        run: |
+          sed -i "s/__version__ = .*/__version__ = \"${{ github.event.inputs.base_version }}\"/" frappe/__init__.py
+          git add frappe/__init__.py
+          git commit -m "chore(release): update version to ${{ github.event.inputs.base_version }}-dev [skip ci]" || echo "No changes to commit"
+
+      - name: Create and push tag
+        run: |
+          TAG_NAME="v${{ github.event.inputs.base_version }}-dev"
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+
+      - name: Create GitHub Release
+        run: |
+          TAG_NAME="v${{ github.event.inputs.base_version }}-dev"
+          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
+          
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="Custom frappe release v${{ github.event.inputs.base_version }}-dev based on upstream Frappe v${{ github.event.inputs.base_version }}
+
+          ## Changes in this release:
+          - Based on upstream Frappe v${{ github.event.inputs.base_version }}
+          - Contains custom modifications and enhancements  
+          - All custom features are preserved
+
+          ## Installation:
+          Use this release tag for your custom Frappe installation."
+          fi
+          
+          gh release create $TAG_NAME \
+            --title "Frappe v${{ github.event.inputs.base_version }}-dev" \
+            --notes "$RELEASE_NOTES" \
+            --target version-15-dev
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push version update
+        run: |
+          git push origin version-15-dev
