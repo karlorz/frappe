@@ -1,9 +1,9 @@
-name: Sync Upstream version-15
+name: Sync Upstream Branches
 
 on:
   schedule:
-    # Run daily at 6 AM UTC / 11:30 AM IST
-    - cron: "0 6 * * *"
+    # Run daily at 0 AM UTC / 08:00 AM HKT
+    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       force_push:
@@ -17,13 +17,16 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch: [version-15, develop]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: version-15
+          ref: ${{ matrix.branch }}
 
       - name: Configure Git
         run: |
@@ -37,29 +40,30 @@ jobs:
 
       - name: Fetch upstream changes
         run: |
-          git fetch upstream version-15
+          git fetch upstream ${{ matrix.branch }}
 
-      - name: Sync version-15 branch
+      - name: Sync ${{ matrix.branch }} branch
         run: |
-          git checkout version-15
+          git checkout ${{ matrix.branch }}
           if [ "${{ github.event.inputs.force_push }}" == "true" ]; then
             echo "Force pushing changes..."
-            git reset --hard upstream/version-15
-            git push --force-with-lease origin version-15
+            git reset --hard upstream/${{ matrix.branch }}
+            git push --force-with-lease origin ${{ matrix.branch }}
           else
             # Try to merge, if conflicts exist, reset to upstream
-            if git merge upstream/version-15 --no-edit; then
+            if git merge upstream/${{ matrix.branch }} --no-edit; then
               echo "Merge successful"
-              git push origin version-15
+              git push origin ${{ matrix.branch }}
             else
               echo "Merge conflicts detected, resetting to upstream"
               git merge --abort
-              git reset --hard upstream/version-15
-              git push --force-with-lease origin version-15
+              git reset --hard upstream/${{ matrix.branch }}
+              git push --force-with-lease origin ${{ matrix.branch }}
             fi
           fi
 
-      - name: Create PR to merge into version-15-dev
+      - name: Create PR to merge into dev branch
+        if: matrix.branch == 'version-15'
         run: |
           # Check if there are differences between version-15 and version-15-dev
           git fetch origin version-15-dev
