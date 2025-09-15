@@ -1,8 +1,8 @@
 name: Regenerate POT file (translatable strings)
 on:
   schedule:
-    # 9:30 UTC => 3 PM IST Sunday
-    - cron: "30 9 * * 0"
+    # 0:30 UTC / 08:30 AM HKT
+    - cron: "30 0 * * 0" 
   workflow_dispatch:
 
 jobs:
@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: ["develop"]
+        branch: ["develop-next"]
     permissions:
       contents: write
 
